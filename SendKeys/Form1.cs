@@ -1,7 +1,10 @@
 ﻿using SendKeys.BLL;
 using SendKeys.BLL.ActiveWindow;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -11,13 +14,23 @@ namespace SendKeys
     {
         private ActiveWindowWatcher activeWindowWatcher;
         private ActiveWindowModel activeWindow = ActiveWindowModel.CreateEmpty();
-
+        private IDictionary<IntPtr, string> windowHandles;
         public Form1()
         {
             InitializeComponent();
             activeWindowWatcher = new ActiveWindowWatcher(TimeSpan.FromSeconds(1));
             activeWindowWatcher.ActiveWindowChanged += ActiveWindowWatcher_ActiveWindowChanged;
             activeWindowWatcher.Start();
+            RefreshWindowList();
+        }
+
+        private void RefreshWindowList()
+        {
+            windowHandles = WindowAPI.GetOpenWindows();
+            windowHandles.Add(System.IntPtr.Zero, string.Empty);
+            cboWindows.DataSource = new BindingSource(windowHandles, null);
+            cboWindows.DisplayMember = "Value";
+            cboWindows.ValueMember = "Key";
         }
 
         private void ActiveWindowWatcher_ActiveWindowChanged(object sender, ActiveWindowChangedEventArgs e)
@@ -35,22 +48,29 @@ namespace SendKeys
 
         private void btnSend_Click(object sender, EventArgs e)
         {
-            WindowAPI.SendKeys(activeWindow.WindowHandle, rbtCTRL.Checked, rbtALT.Checked, cboLetter.Text);
+            // WindowAPI.SendKeys(activeWindow.WindowHandle, rbtCTRL.Checked, rbtALT.Checked, cboLetter.Text);
+            KeyValuePair<IntPtr, string> selected = (KeyValuePair<IntPtr, string>)(cboWindows.SelectedItem);
+            WindowAPI.SendKeys(selected.Key, rbtCTRL.Checked, rbtALT.Checked, cboLetter.Text);
         }
 
         private void txtText_KeyPress(object sender, KeyPressEventArgs e)
         {
-            WindowAPI.SendKeys(activeWindow.WindowHandle, e.KeyChar.ToString());
+            // WindowAPI.SendKeys(activeWindow.WindowHandle, e.KeyChar.ToString());
             // WindowAPI.SetActiveWindow(Process.GetCurrentProcess().MainWindowHandle);
+            KeyValuePair<IntPtr, string> selected = (KeyValuePair<IntPtr, string>)(cboWindows.SelectedItem);
+            WindowAPI.SendKeys(selected.Key, e.KeyChar.ToString());
         }
 
         private void btnSendQueue_Click(object sender, EventArgs e)
         {
-            WindowAPI.SendKeys(activeWindow.WindowHandle, txtQueue.Text);
+            // WindowAPI.SendKeys(activeWindow.WindowHandle, txtQueue.Text);
+            KeyValuePair<IntPtr, string> selected = (KeyValuePair<IntPtr, string>)(cboWindows.SelectedItem);
+            WindowAPI.SendKeys(selected.Key, txtQueue.Text);
         }
 
         private async void btnAutomate_ClickAsync(object sender, EventArgs e)
         {
+            KeyValuePair<IntPtr, string> selected = (KeyValuePair<IntPtr, string>)(cboWindows.SelectedItem);
             string[] toSend =
             {
                 "5/16/2024{TAB}",
@@ -59,9 +79,22 @@ namespace SendKeys
             };
             foreach (string s in toSend)
             {
-                WindowAPI.SendKeys(activeWindow.WindowHandle, s);
+                // WindowAPI.SendKeys(activeWindow.WindowHandle, s);
+                WindowAPI.SendKeys(selected.Key, s);
                 await Task.Delay(1000);
             }
+        }
+
+        private void btnRefresh_Click(object sender, EventArgs e)
+        {
+            RefreshWindowList();
+        }
+
+        private void cboWindows_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            KeyValuePair<IntPtr, string> selected = (KeyValuePair<IntPtr, string>)(cboWindows.SelectedItem);
+            txtActiveWindow.Text = selected.Value;
+            txtWindowHandle.Text = selected.Key.ToString();
         }
     }
 }
